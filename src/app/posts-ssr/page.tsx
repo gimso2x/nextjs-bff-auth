@@ -4,7 +4,7 @@ import {
 } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/query/get-query-client';
 import { postKeys } from '@/lib/query/keys';
-import { getServerApiWithAuth } from '@/lib/axios/server';
+// import { getServerApiWithAuth } from '@/lib/axios/server'; // 인증 API 사용시 주석 해제
 import PostsClient from './posts-client';
 
 /**
@@ -25,12 +25,12 @@ async function getPublicPosts(page: number, limit: number) {
     return response.json();
 }
 
-// 인증 필요 API (쿠키 전달)
-async function getProtectedPosts(page: number, limit: number) {
-    const api = await getServerApiWithAuth();
-    const response = await api.get(`/posts?page=${page}&limit=${limit}`);
-    return response.data;
-}
+// 인증 필요 API 예제 (필요시 주석 해제)
+// async function getProtectedPosts(page: number, limit: number) {
+//   const api = await getServerApiWithAuth();
+//   const response = await api.get(`/posts?page=${page}&limit=${limit}`);
+//   return response.data;
+// }
 
 export default async function PostsSSRPage() {
     const queryClient = getQueryClient();

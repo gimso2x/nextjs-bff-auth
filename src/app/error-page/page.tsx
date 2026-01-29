@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import Link from 'next/link';
 import styles from './error.module.css';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -33,9 +34,9 @@ function ErrorContent() {
                     <a href={ssoLoginUrl} className={styles.primaryButton}>
                         다시 로그인
                     </a>
-                    <a href="/" className={styles.secondaryButton}>
+                    <Link href="/" className={styles.secondaryButton}>
                         홈으로
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

@@ -7,7 +7,7 @@ const MOCK_MODE = process.env.MOCK_MODE === 'true';
 /**
  * Get Current User Route (iron-session + 쿠키 인증 버전)
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
     // iron-session에서 토큰 가져오기
     const tokens = await getTokensFromSession();
 

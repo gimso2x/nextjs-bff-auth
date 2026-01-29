@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // iron-session에서 세션 확인
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = await getIronSession<SessionData>(request.cookies as any, sessionOptions);
 
     if (!session.isLoggedIn || !session.accessToken) {

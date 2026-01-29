@@ -5,7 +5,7 @@ import { createServerApiWithCookies } from '@/lib/axios/server';
 /**
  * Logout Route (iron-session + 쿠키 인증 버전)
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
     try {
         // 세션에서 토큰 가져오기
         const tokens = await getTokensFromSession();
