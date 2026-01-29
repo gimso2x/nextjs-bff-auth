@@ -1,48 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requestWithRefresh } from '@/lib/axios/refresh';
+import { getTokensFromSession } from '@/lib/session';
+import { createServerApiWithCookies } from '@/lib/axios/server';
+
+const MOCK_MODE = process.env.MOCK_MODE === 'true';
 
 /**
- * Get Current User Route
- * Returns the currently authenticated user's information.
+ * Get Current User Route (iron-session 버전)
  */
 export async function GET(request: NextRequest) {
-    const cookieHeader = request.headers.get('cookie');
+    // iron-session에서 토큰 가져오기
+    const tokens = await getTokensFromSession();
 
-    const result = await requestWithRefresh(
-        {
-            method: 'GET',
-            url: '/auth/me',
-        },
-        cookieHeader
-    );
-
-    // Handle session expired
-    if (result.error === 'SESSION_EXPIRED') {
+    if (!tokens?.accessToken) {
         return NextResponse.json(
             { error: 'SESSION_EXPIRED', redirect: '/error-page?code=session_expired' },
             { status: 401 }
         );
     }
 
-    // Handle other errors
-    if (result.error || !result.response) {
-        return NextResponse.json(
-            { error: result.error || 'Failed to get user' },
-            { status: 500 }
-        );
-    }
-
-    // Create response with user data
-    const response = NextResponse.json(result.response.data, {
-        status: result.response.status,
-    });
-
-    // Forward any new cookies (from token refresh)
-    if (result.newCookies) {
-        result.newCookies.forEach((cookie) => {
-            response.headers.append('Set-Cookie', cookie);
+    // Mock 모드
+    if (MOCK_MODE) {
+        return NextResponse.json({
+            id: String(tokens.memberCode || 1),
+            email: `user${tokens.memberCode}@example.com`,
+            name: `Mock User ${tokens.memberCode}`,
+            memberCode: tokens.memberCode,
         });
     }
 
-    return response;
+    // 실제 백엔드 호출
+    try {
+        const api = createServerApiWithCookies(null);
+        api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+
+        const response = await api.get('/auth/me', {
+            validateStatus: (status) => status < 500,
+        });
+
+        if (response.status === 401) {
+            // TODO: refresh token으로 갱신 시도
+            return NextResponse.json(
+                { error: 'SESSION_EXPIRED', redirect: '/error-page?code=session_expired' },
+                { status: 401 }
+            );
+        }
+
+        return NextResponse.json(response.data);
+    } catch (error) {
+        console.error('Get user error:', error);
+        return NextResponse.json(
+            { error: 'Failed to get user' },
+            { status: 500 }
+        );
+    }
 }

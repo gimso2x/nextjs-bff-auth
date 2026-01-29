@@ -1,71 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTokensFromSession, destroySession } from '@/lib/session';
 import { createServerApiWithCookies } from '@/lib/axios/server';
 
 /**
- * Logout Route
- * Clears authentication by calling backend logout and removing cookies.
+ * Logout Route (iron-session 버전)
  */
 export async function POST(request: NextRequest) {
-    const cookieHeader = request.headers.get('cookie');
-
     try {
-        const api = createServerApiWithCookies(cookieHeader);
-        await api.post('/auth/logout', {}, {
-            validateStatus: () => true,
-        });
+        // 세션에서 토큰 가져오기
+        const tokens = await getTokensFromSession();
+
+        if (tokens?.accessToken) {
+            // 백엔드 로그아웃 호출
+            const api = createServerApiWithCookies(null);
+            api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+            await api.post('/auth/logout', {}, { validateStatus: () => true });
+        }
     } catch (error) {
         console.error('Backend logout error:', error);
     }
 
-    // Create response that clears auth cookies
-    const response = NextResponse.json({ success: true });
+    // iron-session 세션 삭제
+    await destroySession();
 
-    const cookiesToClear = ['access_token', 'refresh_token'];
-
-    cookiesToClear.forEach((name) => {
-        response.cookies.set(name, '', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            expires: new Date(0),
-            path: '/',
-            domain: process.env.COOKIE_DOMAIN || undefined,
-        });
-    });
-
-    return response;
+    return NextResponse.json({ success: true });
 }
 
-/**
- * GET handler for logout link (redirect version)
- */
 export async function GET(request: NextRequest) {
-    const cookieHeader = request.headers.get('cookie');
-
     try {
-        const api = createServerApiWithCookies(cookieHeader);
-        await api.post('/auth/logout', {}, {
-            validateStatus: () => true,
-        });
+        const tokens = await getTokensFromSession();
+
+        if (tokens?.accessToken) {
+            const api = createServerApiWithCookies(null);
+            api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+            await api.post('/auth/logout', {}, { validateStatus: () => true });
+        }
     } catch (error) {
         console.error('Backend logout error:', error);
     }
 
-    // 로그아웃 후 홈으로 리다이렉트
-    const response = NextResponse.redirect(new URL('/', request.url));
+    await destroySession();
 
-    const cookiesToClear = ['access_token', 'refresh_token'];
-
-    cookiesToClear.forEach((name) => {
-        response.cookies.set(name, '', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            expires: new Date(0),
-            path: '/',
-            domain: process.env.COOKIE_DOMAIN || undefined,
-        });
-    });
-
-    return response;
+    return NextResponse.redirect(new URL('/', request.url));
 }
