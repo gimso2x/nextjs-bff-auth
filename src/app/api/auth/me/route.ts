@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Handle session expired
     if (result.error === 'SESSION_EXPIRED') {
         return NextResponse.json(
-            { error: 'SESSION_EXPIRED', redirect: '/login?reason=session_expired' },
+            { error: 'SESSION_EXPIRED', redirect: '/error-page?code=session_expired' },
             { status: 401 }
         );
     }
