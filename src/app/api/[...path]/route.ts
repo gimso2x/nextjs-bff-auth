@@ -7,7 +7,7 @@ const MOCK_MODE = process.env.MOCK_MODE === 'true';
 /**
  * BFF Proxy Route Handler (iron-session 버전)
  * 
- * iron-session에서 토큰을 읽어 백엔드에 Authorization 헤더로 전달
+ * iron-session에서 토큰을 읽어 백엔드에 쿠키로 전달
  */
 async function handleRequest(
     request: NextRequest,
@@ -48,7 +48,7 @@ async function handleRequest(
         }
     }
 
-    // Forward headers
+    // Forward headers (cookie 제외 - 직접 설정)
     const forwardHeaders: Record<string, string> = {};
     request.headers.forEach((value, key) => {
         const lowerKey = key.toLowerCase();
@@ -67,10 +67,9 @@ async function handleRequest(
     }
 
     try {
-        const api = createServerApiWithCookies(null);
-
-        // Authorization 헤더로 토큰 전달
-        api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+        // 토큰을 쿠키 형식으로 변환하여 백엔드에 전달
+        const cookieHeader = `access_token=${tokens.accessToken}; refresh_token=${tokens.refreshToken}`;
+        const api = createServerApiWithCookies(cookieHeader);
 
         const response = await api.request({
             method: request.method,
@@ -82,7 +81,8 @@ async function handleRequest(
 
         // 401이면 refresh 시도
         if (response.status === 401 && tokens.refreshToken) {
-            const refreshResult = await tryRefreshToken(tokens.refreshToken);
+            const refreshCookie = `refresh_token=${tokens.refreshToken}`;
+            const refreshResult = await tryRefreshToken(refreshCookie);
 
             if (refreshResult.success && refreshResult.accessToken) {
                 // 새 토큰 저장
@@ -93,8 +93,10 @@ async function handleRequest(
                 );
 
                 // 재시도
-                api.defaults.headers.common['Authorization'] = `Bearer ${refreshResult.accessToken}`;
-                const retryResponse = await api.request({
+                const newCookieHeader = `access_token=${refreshResult.accessToken}; refresh_token=${refreshResult.refreshToken || tokens.refreshToken}`;
+                const retryApi = createServerApiWithCookies(newCookieHeader);
+
+                const retryResponse = await retryApi.request({
                     method: request.method,
                     url: fullPath,
                     data: body,
@@ -121,31 +123,61 @@ async function handleRequest(
     }
 }
 
-async function tryRefreshToken(refreshToken: string): Promise<{
+/**
+ * Refresh token using cookie
+ */
+async function tryRefreshToken(refreshCookie: string): Promise<{
     success: boolean;
     accessToken?: string;
     refreshToken?: string;
 }> {
     try {
-        const api = createServerApiWithCookies(null);
-        api.defaults.headers.common['Authorization'] = `Bearer ${refreshToken}`;
+        const api = createServerApiWithCookies(refreshCookie);
 
         const response = await api.post('/auth/refresh', {}, {
             validateStatus: (status) => status < 500,
         });
 
         if (response.status === 200) {
-            return {
-                success: true,
-                accessToken: response.data.access_token,
-                refreshToken: response.data.refresh_token,
-            };
+            // 백엔드가 JSON으로 토큰을 반환하는 경우
+            if (response.data.access_token) {
+                return {
+                    success: true,
+                    accessToken: response.data.access_token,
+                    refreshToken: response.data.refresh_token,
+                };
+            }
+
+            // 백엔드가 Set-Cookie로 토큰을 반환하는 경우
+            const setCookieHeader = response.headers['set-cookie'];
+            if (setCookieHeader) {
+                const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+                const accessToken = extractTokenFromCookies(cookies, 'access_token');
+                const refreshToken = extractTokenFromCookies(cookies, 'refresh_token');
+
+                if (accessToken) {
+                    return { success: true, accessToken, refreshToken };
+                }
+            }
         }
 
         return { success: false };
     } catch {
         return { success: false };
     }
+}
+
+/**
+ * Set-Cookie 헤더에서 토큰 추출
+ */
+function extractTokenFromCookies(cookies: string[], tokenName: string): string | undefined {
+    for (const cookie of cookies) {
+        const match = cookie.match(new RegExp(`${tokenName}=([^;]+)`));
+        if (match) {
+            return match[1];
+        }
+    }
+    return undefined;
 }
 
 export async function GET(

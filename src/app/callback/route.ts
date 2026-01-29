@@ -45,7 +45,12 @@ export async function GET(request: NextRequest) {
         );
 
         const response = NextResponse.redirect(new URL(returnTo, request.url));
+
+        // 이전 버전 쿠키 삭제 (iron-session 전환 시)
+        response.cookies.delete('access_token');
+        response.cookies.delete('refresh_token');
         response.cookies.delete('auth_return_to');
+
         return response;
     }
 

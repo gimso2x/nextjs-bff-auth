@@ -3,7 +3,7 @@ import { getTokensFromSession, destroySession } from '@/lib/session';
 import { createServerApiWithCookies } from '@/lib/axios/server';
 
 /**
- * Logout Route (iron-session 버전)
+ * Logout Route (iron-session + 쿠키 인증 버전)
  */
 export async function POST(request: NextRequest) {
     try {
@@ -11,9 +11,9 @@ export async function POST(request: NextRequest) {
         const tokens = await getTokensFromSession();
 
         if (tokens?.accessToken) {
-            // 백엔드 로그아웃 호출
-            const api = createServerApiWithCookies(null);
-            api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+            // 백엔드 로그아웃 호출 (쿠키로 토큰 전달)
+            const cookieHeader = `access_token=${tokens.accessToken}; refresh_token=${tokens.refreshToken}`;
+            const api = createServerApiWithCookies(cookieHeader);
             await api.post('/auth/logout', {}, { validateStatus: () => true });
         }
     } catch (error) {
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
         const tokens = await getTokensFromSession();
 
         if (tokens?.accessToken) {
-            const api = createServerApiWithCookies(null);
-            api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+            const cookieHeader = `access_token=${tokens.accessToken}; refresh_token=${tokens.refreshToken}`;
+            const api = createServerApiWithCookies(cookieHeader);
             await api.post('/auth/logout', {}, { validateStatus: () => true });
         }
     } catch (error) {

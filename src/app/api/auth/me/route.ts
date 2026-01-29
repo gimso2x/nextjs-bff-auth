@@ -5,7 +5,7 @@ import { createServerApiWithCookies } from '@/lib/axios/server';
 const MOCK_MODE = process.env.MOCK_MODE === 'true';
 
 /**
- * Get Current User Route (iron-session 버전)
+ * Get Current User Route (iron-session + 쿠키 인증 버전)
  */
 export async function GET(request: NextRequest) {
     // iron-session에서 토큰 가져오기
@@ -28,10 +28,10 @@ export async function GET(request: NextRequest) {
         });
     }
 
-    // 실제 백엔드 호출
+    // 실제 백엔드 호출 (토큰을 쿠키로 전달)
     try {
-        const api = createServerApiWithCookies(null);
-        api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+        const cookieHeader = `access_token=${tokens.accessToken}; refresh_token=${tokens.refreshToken}`;
+        const api = createServerApiWithCookies(cookieHeader);
 
         const response = await api.get('/auth/me', {
             validateStatus: (status) => status < 500,
